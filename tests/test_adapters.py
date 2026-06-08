@@ -11,6 +11,7 @@ from defi_yield_aggregator.adapters.protocols import (
     ConvexAdapter,
     CurveAdapter,
     LidoAdapter,
+    SushiSwapAdapter,
     UniswapAdapter,
     YearnAdapter,
     get_all_adapters,
@@ -82,7 +83,7 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 8
+        assert len(adapters) == 9
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
@@ -189,7 +190,7 @@ class TestAdapters:
     def test_balancer_in_registry(self) -> None:
         """Balancer adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 8
+        assert len(adapters) == 9
         assert any(a.protocol == Protocol.BALANCER for a in adapters)
 
     def test_balancer_adapter_repr(self) -> None:
@@ -247,10 +248,106 @@ class TestAdapters:
     def test_convex_in_registry(self) -> None:
         """Convex adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 8
+        assert len(adapters) == 9
         assert any(a.protocol == Protocol.CONVEX for a in adapters)
 
     def test_convex_adapter_repr(self) -> None:
         adapter = ConvexAdapter()
         assert "ConvexAdapter" in repr(adapter)
         assert "convex" in repr(adapter)
+
+    # --- SushiSwap tests ---
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pools(self) -> None:
+        adapter = SushiSwapAdapter()
+        pools = await adapter.fetch_pools()
+        assert len(pools) == 8
+        assert all(p.protocol == Protocol.SUSHISWAP for p in pools)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pools_chain_filter_eth(self) -> None:
+        adapter = SushiSwapAdapter()
+        eth_pools = await adapter.fetch_pools(chain=Chain.ETHEREUM)
+        assert len(eth_pools) == 3
+        assert all(p.chain == Chain.ETHEREUM for p in eth_pools)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pools_chain_filter_arb(self) -> None:
+        adapter = SushiSwapAdapter()
+        arb_pools = await adapter.fetch_pools(chain=Chain.ARBITRUM)
+        assert len(arb_pools) == 2
+        assert all(p.chain == Chain.ARBITRUM for p in arb_pools)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pools_chain_filter_base(self) -> None:
+        adapter = SushiSwapAdapter()
+        base_pools = await adapter.fetch_pools(chain=Chain.BASE)
+        assert len(base_pools) == 1
+        assert base_pools[0].pool_id == "sushi-eth-usdc-base"
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pools_chain_filter_optimism(self) -> None:
+        adapter = SushiSwapAdapter()
+        op_pools = await adapter.fetch_pools(chain=Chain.OPTIMISM)
+        assert len(op_pools) == 1
+        assert op_pools[0].pool_id == "sushi-eth-usdt-op"
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pool_detail(self) -> None:
+        adapter = SushiSwapAdapter()
+        detail = await adapter.fetch_pool_detail("sushi-eth-usdc-eth")
+        assert detail is not None
+        assert detail.pool_id == "sushi-eth-usdc-eth"
+        assert detail.tvl_usd == 180_000_000
+        assert detail.apy == pytest.approx(0.054)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_fetch_pool_detail_not_found(self) -> None:
+        adapter = SushiSwapAdapter()
+        detail = await adapter.fetch_pool_detail("nonexistent-pool")
+        assert detail is None
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_stable_pools_low_il(self) -> None:
+        """Stable pools (Trident, Kashi) should have low IL risk."""
+        adapter = SushiSwapAdapter()
+        stable_pools = [p for p in await adapter.fetch_pools() if p.is_stable]
+        assert len(stable_pools) == 2
+        assert all(p.impermanent_loss_risk < 0.01 for p in stable_pools)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_amm_pools_have_il_risk(self) -> None:
+        """AMM pools (non-stable) should have meaningful IL risk."""
+        adapter = SushiSwapAdapter()
+        amm_pools = [p for p in await adapter.fetch_pools() if not p.is_stable]
+        assert len(amm_pools) == 6
+        assert all(p.impermanent_loss_risk > 0.1 for p in amm_pools)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_multi_chain_coverage(self) -> None:
+        """SushiSwap should cover 5 chains."""
+        adapter = SushiSwapAdapter()
+        pools = await adapter.fetch_pools()
+        chains = {p.chain for p in pools}
+        assert chains == {Chain.ETHEREUM, Chain.ARBITRUM, Chain.POLYGON, Chain.BASE, Chain.OPTIMISM}
+
+    def test_sushiswap_in_registry(self) -> None:
+        """SushiSwap adapter should be registered in get_all_adapters."""
+        adapters = get_all_adapters()
+        assert len(adapters) == 9
+        assert any(a.protocol == Protocol.SUSHISWAP for a in adapters)
+
+    def test_sushiswap_adapter_repr(self) -> None:
+        adapter = SushiSwapAdapter()
+        assert "SushiSwapAdapter" in repr(adapter)
+        assert "sushiswap" in repr(adapter)
+
+    @pytest.mark.asyncio
+    async def test_sushiswap_kashi_lending_zero_il(self) -> None:
+        """Kashi lending pools should have zero IL risk (single-asset)."""
+        adapter = SushiSwapAdapter()
+        detail = await adapter.fetch_pool_detail("sushi-kashi-usdc-lend")
+        assert detail is not None
+        assert detail.impermanent_loss_risk == 0.0
+        assert detail.is_stable is True

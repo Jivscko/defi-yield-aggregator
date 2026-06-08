@@ -524,6 +524,139 @@ class ConvexAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class SushiSwapAdapter(BaseAdapter):
+    """Adapter for SushiSwap multi-chain DEX with AMM, Trident, and Kashi pools."""
+
+    def __init__(self, base_url: str = "https://api.sushi.com") -> None:
+        super().__init__(Protocol.SUSHISWAP, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch SushiSwap pools across multiple chains.
+
+        SushiSwap offers constant product AMM pools (x*y=k), Trident concentrated
+        liquidity stable pools, and Kashi isolated lending markets. The Onsen menu
+        provides additional SUSHI rewards for select pairs.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of pool information.
+        """
+        mock_pools = [
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.ETHEREUM,
+                pool_id="sushi-eth-usdc-eth",
+                pool_name="SushiSwap ETH/USDC (Ethereum)",
+                token_pair="ETH/USDC",
+                apy=0.0540,
+                tvl_usd=180_000_000,
+                daily_volume_usd=35_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.30,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.ETHEREUM,
+                pool_id="sushi-wbtc-eth-eth",
+                pool_name="SushiSwap WBTC/ETH (Ethereum)",
+                token_pair="WBTC/ETH",
+                apy=0.0420,
+                tvl_usd=95_000_000,
+                daily_volume_usd=12_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.15,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.ETHEREUM,
+                pool_id="sushi-kashi-usdc-lend",
+                pool_name="SushiSwap Kashi USDC Lending",
+                token_pair="USDC",
+                apy=0.0380,
+                tvl_usd=28_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.ARBITRUM,
+                pool_id="sushi-usdc-usdt-arb",
+                pool_name="SushiSwap Trident USDC/USDT (Arbitrum)",
+                token_pair="USDC/USDT",
+                apy=0.0290,
+                tvl_usd=62_000_000,
+                daily_volume_usd=18_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.002,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.ARBITRUM,
+                pool_id="sushi-eth-usdc-arb",
+                pool_name="SushiSwap ETH/USDC (Arbitrum)",
+                token_pair="ETH/USDC",
+                apy=0.0680,
+                tvl_usd=45_000_000,
+                daily_volume_usd=8_500_000,
+                is_stable=False,
+                impermanent_loss_risk=0.32,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.POLYGON,
+                pool_id="sushi-matic-usdc-poly",
+                pool_name="SushiSwap MATIC/USDC (Polygon)",
+                token_pair="MATIC/USDC",
+                apy=0.0750,
+                tvl_usd=22_000_000,
+                daily_volume_usd=4_200_000,
+                is_stable=False,
+                impermanent_loss_risk=0.38,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.BASE,
+                pool_id="sushi-eth-usdc-base",
+                pool_name="SushiSwap ETH/USDC (Base)",
+                token_pair="ETH/USDC",
+                apy=0.0890,
+                tvl_usd=15_000_000,
+                daily_volume_usd=3_800_000,
+                is_stable=False,
+                impermanent_loss_risk=0.35,
+            ),
+            PoolInfo(
+                protocol=Protocol.SUSHISWAP,
+                chain=Chain.OPTIMISM,
+                pool_id="sushi-eth-usdt-op",
+                pool_name="SushiSwap ETH/USDT (Optimism)",
+                token_pair="ETH/USDT",
+                apy=0.0620,
+                tvl_usd=18_000_000,
+                daily_volume_usd=2_100_000,
+                is_stable=False,
+                impermanent_loss_risk=0.28,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific SushiSwap pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``sushi-eth-usdc-eth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -534,6 +667,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.LIDO: LidoAdapter,
     Protocol.BALANCER: BalancerAdapter,
     Protocol.CONVEX: ConvexAdapter,
+    Protocol.SUSHISWAP: SushiSwapAdapter,
 }
 
 
