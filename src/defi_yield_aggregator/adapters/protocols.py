@@ -766,6 +766,120 @@ class RocketPoolAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class FraxAdapter(BaseAdapter):
+    """Adapter for Frax Finance ecosystem.
+
+    Covers sFRAX staked stablecoin yields, Fraxlend lending markets,
+    and FraxBP Curve-based liquidity pools.  All data is mock / indicative.
+    """
+
+    def __init__(self, base_url: str = "https://api.frax.finance") -> None:
+        super().__init__(Protocol.FRAX, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Frax Finance yield opportunities.
+
+        Returns pools across Ethereum and Arbitrum:
+        - **sFRAX** – ERC-4626 vault backed by Finres T-bill yields.
+        - **Fraxlend** – over-collateralised lending markets.
+        - **FraxBP** – Curve-native FRAX/USDC stable LP.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of :class:`PoolInfo` objects.
+        """
+        mock_pools: list[PoolInfo] = [
+            # ── sFRAX staking (Ethereum) ──────────────────────────────
+            PoolInfo(
+                protocol=Protocol.FRAX,
+                chain=Chain.ETHEREUM,
+                pool_id="frax-sfrax-eth",
+                pool_name="Frax sFRAX Staking",
+                token_pair="sFRAX",
+                apy=0.0475,
+                tvl_usd=820_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── sFRAX staking (Arbitrum) ──────────────────────────────
+            PoolInfo(
+                protocol=Protocol.FRAX,
+                chain=Chain.ARBITRUM,
+                pool_id="frax-sfrax-arb",
+                pool_name="Frax sFRAX Staking (Arbitrum)",
+                token_pair="sFRAX",
+                apy=0.0460,
+                tvl_usd=95_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── Fraxlend: FRAX/USDC lending (Ethereum) ───────────────
+            PoolInfo(
+                protocol=Protocol.FRAX,
+                chain=Chain.ETHEREUM,
+                pool_id="frax-fraxlend-frax-usdc",
+                pool_name="Fraxlend FRAX/USDC",
+                token_pair="FRAX/USDC",
+                apy=0.0560,
+                tvl_usd=180_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── Fraxlend: FRAX/WETH lending (Ethereum) ───────────────
+            PoolInfo(
+                protocol=Protocol.FRAX,
+                chain=Chain.ETHEREUM,
+                pool_id="frax-fraxlend-frax-weth",
+                pool_name="Fraxlend FRAX/WETH",
+                token_pair="FRAX/WETH",
+                apy=0.0820,
+                tvl_usd=62_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0001,
+            ),
+            # ── FraxBP Curve LP (Ethereum) ────────────────────────────
+            PoolInfo(
+                protocol=Protocol.FRAX,
+                chain=Chain.ETHEREUM,
+                pool_id="frax-fraxbp-curve",
+                pool_name="FraxBP (FRAX/USDC) Curve LP",
+                token_pair="FRAX/USDC",
+                apy=0.0380,
+                tvl_usd=420_000_000,
+                daily_volume_usd=35_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.003,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0004,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific Frax pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``frax-sfrax-eth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
