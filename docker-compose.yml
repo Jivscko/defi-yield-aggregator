@@ -1,0 +1,24 @@
+services:
+  defi-yield:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: defi-yield-aggregator:latest
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    # No ports exposed — this is a CLI tool, not a server.
+    # Usage:
+    #   docker compose run --rm defi-yield pools
+    #   docker compose run --rm defi-yield risk --max-risk 50
+    #   docker compose run --rm defi-yield optimize 10000
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: defi-yield-aggregator:latest
+    entrypoint: ["pytest", "tests/", "-v", "--tb=short"]
+    # Override entrypoint to run tests instead of CLI
+    # Usage: docker compose run --rm test
+    volumes:
+      - ./tests:/app/tests:ro

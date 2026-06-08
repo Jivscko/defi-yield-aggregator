@@ -37,6 +37,7 @@ dev = [
     "hypothesis>=6.0",
     "ruff>=0.1.0",
     "mypy>=1.5",
+    "pre-commit>=4.0",
 ]
 
 [project.scripts]
