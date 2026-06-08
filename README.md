@@ -5,50 +5,76 @@ A production-quality Python tool for monitoring yield farming opportunities acro
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLI (Click + Rich)                   │
-│  pools │ risk │ optimize │ version                          │
-├─────────────────────────────────────────────────────────────┤
-│                    Portfolio Optimizer                       │
-│         (greedy allocation, risk constraints)                │
-├──────────────────────┬──────────────────────────────────────┤
-│    Risk Engine       │         APY Calculator               │
-│  TVL / Age / Audit   │   compound interest, fees, IL        │
-│  Chain diversity     │                                      │
-├──────────────────────┴──────────────────────────────────────┤
-│                   Data Models (Pydantic)                     │
-│  PoolInfo │ RiskScore │ Portfolio │ Config                  │
-├─────────────────────────────────────────────────────────────┤
-│                    Protocol Adapters                         │
-│  ┌───────┐ ┌──────────┐ ┌─────────┐ ┌───────┐ ┌─────────┐ │
-│  │ Aave  │ │ Compound │ │Uniswap  │ │ Curve │ │  Yearn  │ │
-│  └───────┘ └──────────┘ └─────────┘ └───────┘ └─────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      CLI (Click + Rich)                         │
+│   pools │ risk │ optimize │ version                             │
+├─────────────────────────────────────────────────────────────────┤
+│              Portfolio Optimizer                                 │
+│   greedy │ Kelly Criterion │ risk parity                        │
+├────────────────────────────┬────────────────────────────────────┤
+│   Strategy Simulator       │    Historical APY Tracker          │
+│   Monte Carlo backtesting  │    time-series analysis            │
+├────────────────────────────┼────────────────────────────────────┤
+│   Risk Engine              │    APY Calculator                  │
+│   TVL / Age / Audit / SC   │    compound interest, fees, IL     │
+│   Chain diversity / Liq    │                                    │
+├────────────────────────────┼────────────────────────────────────┤
+│   Gas Estimator            │    Alerts & Notifications          │
+│   cross-chain cost model   │    webhook / Telegram / console    │
+├────────────────────────────┼────────────────────────────────────┤
+│   Cache (async TTL+LRU)   │    Rate Limiter                    │
+│                            │    token bucket + sliding window   │
+├────────────────────────────┴────────────────────────────────────┤
+│                   Data Models (Pydantic v2)                      │
+│   PoolInfo │ RiskScore │ Portfolio │ Config                     │
+├─────────────────────────────────────────────────────────────────┤
+│                    Protocol Adapters (11)                        │
+│  Aave │ Compound │ Uniswap │ Curve │ Yearn │ Lido              │
+│  Balancer │ Convex │ SushiSwap │ Rocket Pool │ Frax             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Features
 
-- **Multi-protocol monitoring** — Aave, Compound, Uniswap, Curve, Yearn
-- **Risk scoring engine** — TVL-based, protocol age, audit status, chain diversity
-- **Portfolio optimizer** — Maximize yield given configurable risk constraints
-- **APY calculator** — Compound interest, fee-adjusted returns, impermanent loss
+- **11 protocol adapters** — Aave, Compound, Uniswap, Curve, Yearn, Lido, Balancer, Convex, SushiSwap, Rocket Pool, Frax
+- **6-chain support** — Ethereum, Arbitrum, Optimism, Polygon, Base, Avalanche
+- **Risk scoring engine** — TVL, protocol age, audit status, chain diversity, liquidity risk, smart contract risk
+- **3 optimization strategies** — Greedy allocation, Kelly Criterion, Risk Parity
+- **Strategy simulator** — Monte Carlo backtesting with rebalancing, gas costs, slippage
+- **Historical APY tracker** — Time-series storage and trend analysis
+- **Impermanent loss calculator** — IL estimation for LP positions
+- **Gas cost estimator** — Cross-chain gas modeling with net APY calculation
+- **Alert system** — Webhook, Telegram, and console notifications with configurable rules
+- **Async caching** — TTL cache with LRU eviction and hit-rate statistics
+- **Rate limiting** — Token bucket and sliding window strategies
 - **Rich CLI** — Beautiful terminal output with tables, panels, and color
-- **YAML configuration** — Easy to customize protocols, risk weights, and thresholds
-- **Type-safe** — Full type hints and Pydantic data validation
-- **Tested** — Comprehensive test suite with 40+ tests
+- **Docker support** — Multi-stage Dockerfile and docker-compose
+- **CI/CD** — GitHub Actions with lint, typecheck, test matrix, and security audit
+- **Type-safe** — Full type hints, Pydantic v2 validation, mypy strict mode
+- **Well-tested** — Comprehensive test suite with property-based testing (hypothesis)
 
-## Installation
+## Quick Start
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/Jivscko/defi-yield-aggregator.git
 cd defi-yield-aggregator
-
-# Install in development mode
 pip install -e ".[dev]"
 
-# Or install from PyPI (when published)
-pip install defi-yield-aggregator
+# List available pools
+defi-yield pools
+
+# Run risk assessment
+defi-yield risk --max-risk 50
+
+# Optimize a portfolio
+defi-yield optimize 100000 --max-risk 60
+
+# Run tests
+make test
+
+# Set up pre-commit hooks
+make pre-commit-install
 ```
 
 ## Usage
@@ -64,6 +90,9 @@ defi-yield pools --chain ethereum --protocol aave
 
 # Stablecoins only, sorted by APY
 defi-yield pools --stablecoins --sort apy
+
+# Filter by minimum TVL
+defi-yield pools --min-tvl 100000000
 ```
 
 ### Risk Assessment
@@ -120,10 +149,12 @@ Edit `config.yaml` to customize behavior:
 ```yaml
 risk:
   weights:
-    tvl: 0.35
-    age: 0.20
-    audit: 0.25
-    chain_diversity: 0.20
+    tvl: 0.25
+    age: 0.15
+    audit: 0.20
+    chain_diversity: 0.10
+    liquidity: 0.15
+    smart_contract_risk: 0.15
   max_score: 70.0
 
 portfolio:
@@ -132,20 +163,86 @@ portfolio:
   stablecoins_only: false
 ```
 
+## Programmatic Usage
+
+```python
+import asyncio
+from defi_yield_aggregator.adapters.protocols import get_all_adapters
+from defi_yield_aggregator.core.optimizer import PortfolioOptimizer, AllocationStrategy
+from defi_yield_aggregator.core.risk_engine import RiskEngine
+from defi_yield_aggregator.core.gas_estimator import GasEstimator, Operation
+from defi_yield_aggregator.core.models import Config, Chain
+
+async def main():
+    # Fetch pools from all protocols
+    adapters = get_all_adapters()
+    pools = []
+    for adapter in adapters:
+        pools.extend(await adapter.fetch_pools())
+
+    # Score risk
+    engine = RiskEngine()
+    scores = engine.score_pools(pools)
+
+    # Optimize portfolio
+    optimizer = PortfolioOptimizer(strategy=AllocationStrategy.KELLY)
+    portfolio = optimizer.optimize(pools, investment_usd=100_000)
+
+    # Estimate gas costs
+    gas = GasEstimator()
+    net = gas.estimate_net_apy(pools[0], investment_usd=10_000, holding_period_days=90)
+    print(f"Net APY after gas: {net['net_apy']:.2%}")
+
+asyncio.run(main())
+```
+
 ## Development
 
 ```bash
 # Run tests
 make test
 
-# Run linter
+# Run tests with coverage
+make test-cov
+
+# Lint
 make lint
 
 # Format code
 make format
 
+# Type check
+make typecheck
+
 # Run all checks
 make check
+
+# Docker
+make docker-build
+make docker-run ARGS='pools --chain ethereum'
+```
+
+## Project Structure
+
+```
+src/defi_yield_aggregator/
+├── adapters/
+│   ├── base.py          # Abstract adapter interface
+│   └── protocols.py     # 11 protocol adapters (Aave → Frax)
+├── cli/
+│   └── main.py          # Click CLI with Rich output
+└── core/
+    ├── alerts.py         # Alert engine (webhook/Telegram/console)
+    ├── apy_calculator.py # Compound interest & fee math
+    ├── cache.py          # Async TTL cache with LRU eviction
+    ├── gas_estimator.py  # Cross-chain gas cost modeling
+    ├── historical_tracker.py  # APY time-series storage
+    ├── il_calculator.py  # Impermanent loss calculator
+    ├── models.py         # Pydantic data models
+    ├── optimizer.py      # Portfolio optimization (greedy/Kelly/risk parity)
+    ├── rate_limiter.py   # Token bucket & sliding window
+    ├── risk_engine.py    # Multi-factor risk scoring
+    └── strategy_simulator.py  # Monte Carlo backtesting
 ```
 
 ## License
