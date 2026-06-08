@@ -28,6 +28,7 @@ class Protocol(str, Enum):
     BALANCER = "balancer"
     CONVEX = "convex"
     SUSHISWAP = "sushiswap"
+    ROCKET_POOL = "rocket_pool"
 
 
 class RiskLevel(str, Enum):

@@ -657,6 +657,115 @@ class SushiSwapAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class RocketPoolAdapter(BaseAdapter):
+    """Adapter for Rocket Pool decentralized liquid staking protocol.
+
+    Rocket Pool is the leading decentralized ETH staking protocol. Users deposit
+    ETH and receive rETH, a liquid staking token that accrues staking rewards
+    automatically. Unlike Lido, Rocket Pool uses a decentralized network of
+    node operators (minipool operators) with 8/16 ETH bonds, making it more
+    censorship-resistant.
+
+    Key features:
+    - rETH: rebasing-free liquid staking token (value accrual model)
+    - Minipools: node operators run validators with reduced capital (8 ETH)
+    - NO RPL requirement for stakers (only for node operators)
+    - Deployed on Ethereum mainnet with bridged rETH on Arbitrum, Optimism, Base
+    """
+
+    def __init__(self, base_url: str = "https://api.rocketpool.net") -> None:
+        super().__init__(Protocol.ROCKET_POOL, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Rocket Pool staking pools across chains.
+
+        Returns mock data representing the rETH staking vault and
+        rETH DeFi opportunities on L2s. The base rETH staking rate
+        is determined by Ethereum consensus + execution layer rewards,
+        typically running 0.5-1.5% higher than solo staking due to
+        the pooling efficiency.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of pool information.
+        """
+        mock_pools = [
+            PoolInfo(
+                protocol=Protocol.ROCKET_POOL,
+                chain=Chain.ETHEREUM,
+                pool_id="rocket-pool-reth-eth",
+                pool_name="Rocket Pool rETH Staking",
+                token_pair="rETH",
+                apy=0.0335,
+                tvl_usd=5_800_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.ROCKET_POOL,
+                chain=Chain.ETHEREUM,
+                pool_id="rocket-pool-reth-eth-curve",
+                pool_name="Rocket Pool rETH/ETH (Curve LP)",
+                token_pair="rETH/ETH",
+                apy=0.0410,
+                tvl_usd=320_000_000,
+                daily_volume_usd=18_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.03,
+            ),
+            PoolInfo(
+                protocol=Protocol.ROCKET_POOL,
+                chain=Chain.ARBITRUM,
+                pool_id="rocket-pool-reth-arb",
+                pool_name="Rocket Pool rETH (Arbitrum)",
+                token_pair="rETH",
+                apy=0.0320,
+                tvl_usd=450_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.ROCKET_POOL,
+                chain=Chain.OPTIMISM,
+                pool_id="rocket-pool-reth-op",
+                pool_name="Rocket Pool rETH (Optimism)",
+                token_pair="rETH",
+                apy=0.0318,
+                tvl_usd=280_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.ROCKET_POOL,
+                chain=Chain.BASE,
+                pool_id="rocket-pool-reth-base",
+                pool_name="Rocket Pool rETH (Base)",
+                token_pair="rETH",
+                apy=0.0315,
+                tvl_usd=120_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific Rocket Pool pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``rocket-pool-reth-eth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -668,6 +777,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.BALANCER: BalancerAdapter,
     Protocol.CONVEX: ConvexAdapter,
     Protocol.SUSHISWAP: SushiSwapAdapter,
+    Protocol.ROCKET_POOL: RocketPoolAdapter,
 }
 
 

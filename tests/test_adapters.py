@@ -11,6 +11,7 @@ from defi_yield_aggregator.adapters.protocols import (
     ConvexAdapter,
     CurveAdapter,
     LidoAdapter,
+    RocketPoolAdapter,
     SushiSwapAdapter,
     UniswapAdapter,
     YearnAdapter,
@@ -83,7 +84,7 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 9
+        assert len(adapters) == 10
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
@@ -190,7 +191,7 @@ class TestAdapters:
     def test_balancer_in_registry(self) -> None:
         """Balancer adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 9
+        assert len(adapters) == 10
         assert any(a.protocol == Protocol.BALANCER for a in adapters)
 
     def test_balancer_adapter_repr(self) -> None:
@@ -248,7 +249,7 @@ class TestAdapters:
     def test_convex_in_registry(self) -> None:
         """Convex adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 9
+        assert len(adapters) == 10
         assert any(a.protocol == Protocol.CONVEX for a in adapters)
 
     def test_convex_adapter_repr(self) -> None:
@@ -335,7 +336,7 @@ class TestAdapters:
     def test_sushiswap_in_registry(self) -> None:
         """SushiSwap adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 9
+        assert len(adapters) == 10
         assert any(a.protocol == Protocol.SUSHISWAP for a in adapters)
 
     def test_sushiswap_adapter_repr(self) -> None:
@@ -351,3 +352,90 @@ class TestAdapters:
         assert detail is not None
         assert detail.impermanent_loss_risk == 0.0
         assert detail.is_stable is True
+
+    # --- Rocket Pool tests ---
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pools(self) -> None:
+        adapter = RocketPoolAdapter()
+        pools = await adapter.fetch_pools()
+        assert len(pools) == 5
+        assert all(p.protocol == Protocol.ROCKET_POOL for p in pools)
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pools_chain_filter_eth(self) -> None:
+        adapter = RocketPoolAdapter()
+        eth_pools = await adapter.fetch_pools(chain=Chain.ETHEREUM)
+        assert len(eth_pools) == 2
+        assert all(p.chain == Chain.ETHEREUM for p in eth_pools)
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pools_chain_filter_arb(self) -> None:
+        adapter = RocketPoolAdapter()
+        arb_pools = await adapter.fetch_pools(chain=Chain.ARBITRUM)
+        assert len(arb_pools) == 1
+        assert arb_pools[0].pool_id == "rocket-pool-reth-arb"
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pools_chain_filter_op(self) -> None:
+        adapter = RocketPoolAdapter()
+        op_pools = await adapter.fetch_pools(chain=Chain.OPTIMISM)
+        assert len(op_pools) == 1
+        assert op_pools[0].pool_id == "rocket-pool-reth-op"
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pools_chain_filter_base(self) -> None:
+        adapter = RocketPoolAdapter()
+        base_pools = await adapter.fetch_pools(chain=Chain.BASE)
+        assert len(base_pools) == 1
+        assert base_pools[0].pool_id == "rocket-pool-reth-base"
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pool_detail(self) -> None:
+        adapter = RocketPoolAdapter()
+        detail = await adapter.fetch_pool_detail("rocket-pool-reth-eth")
+        assert detail is not None
+        assert detail.pool_id == "rocket-pool-reth-eth"
+        assert detail.tvl_usd == 5_800_000_000
+        assert detail.apy == pytest.approx(0.0335)
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_fetch_pool_detail_not_found(self) -> None:
+        adapter = RocketPoolAdapter()
+        detail = await adapter.fetch_pool_detail("nonexistent-pool")
+        assert detail is None
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_reth_staking_zero_il(self) -> None:
+        """Pure rETH staking (single-asset) should have zero IL risk."""
+        adapter = RocketPoolAdapter()
+        detail = await adapter.fetch_pool_detail("rocket-pool-reth-eth")
+        assert detail is not None
+        assert detail.impermanent_loss_risk == 0.0
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_curve_lp_has_il_risk(self) -> None:
+        """Curve LP position (rETH/ETH) should have non-zero IL risk."""
+        adapter = RocketPoolAdapter()
+        detail = await adapter.fetch_pool_detail("rocket-pool-reth-eth-curve")
+        assert detail is not None
+        assert detail.impermanent_loss_risk > 0.0
+
+    @pytest.mark.asyncio
+    async def test_rocket_pool_multi_chain_coverage(self) -> None:
+        """Rocket Pool should cover Ethereum + L2s."""
+        adapter = RocketPoolAdapter()
+        pools = await adapter.fetch_pools()
+        chains = {p.chain for p in pools}
+        assert chains == {Chain.ETHEREUM, Chain.ARBITRUM, Chain.OPTIMISM, Chain.BASE}
+
+    def test_rocket_pool_in_registry(self) -> None:
+        """Rocket Pool adapter should be registered in get_all_adapters."""
+        adapters = get_all_adapters()
+        assert len(adapters) == 10
+        assert any(a.protocol == Protocol.ROCKET_POOL for a in adapters)
+
+    def test_rocket_pool_adapter_repr(self) -> None:
+        adapter = RocketPoolAdapter()
+        assert "RocketPoolAdapter" in repr(adapter)
+        assert "rocket_pool" in repr(adapter)

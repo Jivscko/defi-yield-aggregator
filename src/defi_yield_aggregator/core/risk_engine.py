@@ -19,6 +19,7 @@ PROTOCOL_META: dict[Protocol, tuple[int, int, int]] = {
     Protocol.CURVE: (2020, 4, 10),
     Protocol.YEARN: (2020, 3, 4),
     Protocol.LIDO: (2020, 5, 6),
+    Protocol.ROCKET_POOL: (2021, 6, 3),
 }
 
 # Smart contract risk metadata: (complexity_score, has_proxy_pattern, has_composability_risk)
@@ -30,6 +31,7 @@ PROTOCOL_SC_META: dict[Protocol, tuple[int, bool, bool]] = {
     Protocol.YEARN: (40, True, True),
     Protocol.LIDO: (20, True, False),
     Protocol.BALANCER: (30, True, True),
+    Protocol.ROCKET_POOL: (35, True, False),
 }
 _DEFAULT_SC_META: tuple[int, bool, bool] = (50, True, True)
 
