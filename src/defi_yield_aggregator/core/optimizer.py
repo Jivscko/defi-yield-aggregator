@@ -33,6 +33,7 @@ class AllocationStrategy(str, Enum):
     GREEDY = "greedy"
     KELLY = "kelly"
     RISK_PARITY = "risk_rarity"
+    BLACK_LITTERMAN = "black_litterman"
 
 
 def _pool_volatility(pool: PoolInfo, risk: RiskScore) -> float:
@@ -367,20 +368,189 @@ def _risk_parity_optimize(
     )
 
 
-class PortfolioOptimizer:
-    """Optimizes DeFi portfolio allocation to maximize yield under risk constraints.
+def _black_litterman_optimize(
+    candidates: list[tuple[PoolInfo, RiskScore]],
+    investment_usd: float,
+    config: Config,
+    tau: float = 0.05,
+) -> OptimizedPortfolio:
+    """Black-Litterman allocation: blend market equilibrium with investor views.
 
-    Supports three allocation strategies:
+    The Black-Litterman model starts from a market-cap-weighted prior
+    (implied equilibrium returns based on TVL proportions) and then
+    blends in investor "views" (expressed through APY expectations and
+    risk confidence) to produce posterior expected returns.  The result
+    is a portfolio that tilts away from the market portfolio only where
+    the investor has high-conviction views.
+
+    **DeFi adaptation:**
+
+    - Market weights ``w_mkt`` are derived from each pool's TVL share
+      (pools with more TVL represent the market's revealed preference).
+    - The risk aversion parameter ``delta`` controls how sensitive the
+      equilibrium is to volatility.
+    - Investor views are constructed from each pool's APY relative to
+      the market-implied return, with uncertainty proportional to the
+      risk score (higher risk → less confident view).
+    - The covariance matrix ``Sigma`` is estimated from the risk-score
+      based volatility model (same as Kelly / Risk Parity).
+
+    Args:
+        candidates: Pools with their risk scores.
+        investment_usd: Total capital to allocate.
+        config: Portfolio constraints.
+        tau: Uncertainty scaling factor for the prior (typically 0.01–0.1).
+            Higher ``tau`` means less trust in the equilibrium and more
+            weight on the investor views.  Default 0.05.
+
+    Returns:
+        Optimized portfolio with Black-Litterman posterior allocations.
+    """
+    n = len(candidates)
+    if n == 0:
+        return OptimizedPortfolio(
+            allocations=[], total_expected_apy=0.0,
+            weighted_risk_score=0.0, total_investment_usd=0.0,
+        )
+
+    pools = [p for p, _ in candidates]
+    risks = [r for _, r in candidates]
+
+    # --- Step 1: Market weights from TVL proportions ---
+    tvls = np.array([max(p.tvl_usd, 1.0) for p in pools])
+    w_mkt = tvls / tvls.sum()
+
+    # --- Step 2: Covariance matrix from risk-based volatilities ---
+    vols = np.array([_pool_volatility(p, r) for p, r in candidates])
+    Sigma = np.diag(vols ** 2)
+
+    # --- Step 3: Risk aversion parameter ---
+    # Use a moderate risk aversion (common literature value: 2.5)
+    delta = 2.5
+
+    # --- Step 4: Implied equilibrium returns (prior) ---
+    # pi = delta * Sigma * w_mkt
+    pi = delta * Sigma @ w_mkt
+
+    # --- Step 5: Investor views ---
+    # Each pool gets an "absolute view": the expected return from its APY,
+    # discounted by risk.  P = I (identity — one view per asset).
+    # Q = risk-adjusted APY for each pool.
+    # Omega = diagonal uncertainty, proportional to risk score.
+    P = np.eye(n)
+    Q = np.array([
+        p.apy * (1.0 - r.overall_score / 200.0)  # risk discount
+        for p, r in candidates
+    ])
+
+    # View uncertainty: higher risk → higher uncertainty (less confident)
+    # Base uncertainty scales with tau * Sigma (the Idzorek approach)
+    omega_diag = np.array([
+        tau * (r.overall_score / 100.0) * vols[i] ** 2
+        for i, (_, r) in enumerate(candidates)
+    ])
+    Omega = np.diag(omega_diag)
+
+    # --- Step 6: Black-Litterman posterior returns ---
+    # mu_BL = [(tau * Sigma)^-1 + P^T Omega^-1 P]^-1
+    #          * [(tau * Sigma)^-1 pi + P^T Omega^-1 Q]
+    tau_Sigma_inv = np.linalg.inv(tau * Sigma)
+    Omega_inv = np.linalg.inv(Omega)
+
+    M = tau_Sigma_inv + P.T @ Omega_inv @ P
+    mu_BL = np.linalg.solve(M, tau_Sigma_inv @ pi + Omega_inv @ Q)
+
+    # --- Step 7: Optimal weights from posterior returns ---
+    # w* = (delta * Sigma)^-1 * mu_BL
+    w_star = np.linalg.solve(delta * Sigma, mu_BL)
+
+    # --- Step 8: Normalize, cap, and re-normalize ---
+    # Remove negative weights (short selling not allowed in DeFi)
+    w_star = np.maximum(w_star, 0.0)
+    total_w = w_star.sum()
+    if total_w > 0:
+        w_star = w_star / total_w
+    else:
+        # Fallback to equal weight if all weights collapsed
+        w_star = np.ones(n) / n
+
+    # Take only the top max_positions pools by weight
+    if n > config.max_positions:
+        top_indices = np.argsort(w_star)[::-1][: config.max_positions]
+        mask = np.zeros(n, dtype=bool)
+        mask[top_indices] = True
+        w_star = np.where(mask, w_star, 0.0)
+        total_w = w_star.sum()
+        if total_w > 0:
+            w_star = w_star / total_w
+
+    # Cap at max_single_allocation_pct (iterate until stable)
+    for _ in range(10):
+        w_star = np.minimum(w_star, config.max_single_allocation_pct)
+        total_w = w_star.sum()
+        if total_w >= 0.999:
+            break
+        if total_w > 0:
+            w_star = w_star * (1.0 / total_w)
+        else:
+            break
+
+    # --- Step 9: Build allocations ---
+    allocations: list[PortfolioAllocation] = []
+    for i, (pool, risk) in enumerate(candidates):
+        frac = w_star[i]
+        if frac < 0.001:
+            continue
+        amount = investment_usd * frac
+        allocations.append(
+            PortfolioAllocation(
+                pool_id=pool.pool_id,
+                protocol=pool.protocol,
+                chain=pool.chain,
+                token_pair=pool.token_pair,
+                allocation_pct=round(float(frac), 4),
+                expected_apy=pool.apy,
+                risk_score=risk.overall_score,
+                amount_usd=round(amount, 2),
+            )
+        )
+
+    if not allocations:
+        return OptimizedPortfolio(
+            allocations=[], total_expected_apy=0.0,
+            weighted_risk_score=0.0, total_investment_usd=0.0,
+        )
+
+    total_apy = sum(a.allocation_pct * a.expected_apy for a in allocations)
+    total_risk = sum(a.allocation_pct * a.risk_score for a in allocations)
+
+    return OptimizedPortfolio(
+        allocations=allocations,
+        total_expected_apy=round(total_apy, 6),
+        weighted_risk_score=round(total_risk, 2),
+        total_investment_usd=investment_usd,
+    )
+
+
+class PortfolioOptimizer:
+    """Optimize DeFi portfolio allocation to maximize yield under risk constraints.
+
+    Supports four allocation strategies:
 
     - ``GREEDY``: Sort by yield/risk ratio and allocate top pools.
     - ``KELLY``: Kelly Criterion sizing for maximum geometric growth.
     - ``RISK_PARITY``: Inverse-volatility weighting for equal risk contribution.
+    - ``BLACK_LITTERMAN``: Bayesian blending of market equilibrium with investor views.
 
     Args:
         config: Portfolio constraints and preferences.
         strategy: Allocation strategy to use.
         kelly_fraction: Fractional Kelly multiplier (only used with KELLY strategy).
             0.5 = half-Kelly (conservative), 1.0 = full Kelly (aggressive).
+        bl_tau: Uncertainty scaling factor for the prior (only used with
+            BLACK_LITTERMAN strategy).  Higher values mean less trust in
+            the market equilibrium and more weight on investor views.
+            Typical range: 0.01–0.1.  Default 0.05.
 
     Example::
 
@@ -393,15 +563,21 @@ class PortfolioOptimizer:
         config: Optional[Config] = None,
         strategy: AllocationStrategy = AllocationStrategy.GREEDY,
         kelly_fraction: float = 0.5,
+        bl_tau: float = 0.05,
     ) -> None:
         if not 0.0 < kelly_fraction <= 1.0:
             raise ValueError(
                 f"kelly_fraction must be in (0, 1], got {kelly_fraction}"
             )
+        if not 0.0 < bl_tau <= 1.0:
+            raise ValueError(
+                f"bl_tau must be in (0, 1], got {bl_tau}"
+            )
         self.config = config or Config()
         self.risk_engine = RiskEngine()
         self.strategy = strategy
         self.kelly_fraction = kelly_fraction
+        self.bl_tau = bl_tau
 
     def optimize(
         self,
@@ -455,5 +631,9 @@ class PortfolioOptimizer:
             )
         if self.strategy is AllocationStrategy.RISK_PARITY:
             return _risk_parity_optimize(risk_filtered, investment_usd, self.config)
+        if self.strategy is AllocationStrategy.BLACK_LITTERMAN:
+            return _black_litterman_optimize(
+                risk_filtered, investment_usd, self.config, self.bl_tau
+            )
         # Default: greedy
         return _greedy_optimize(risk_filtered, investment_usd, self.config)
