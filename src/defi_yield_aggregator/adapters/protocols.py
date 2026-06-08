@@ -892,6 +892,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.CONVEX: ConvexAdapter,
     Protocol.SUSHISWAP: SushiSwapAdapter,
     Protocol.ROCKET_POOL: RocketPoolAdapter,
+    Protocol.FRAX: FraxAdapter,
 }
 
 

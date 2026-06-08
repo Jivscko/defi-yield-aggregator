@@ -10,6 +10,7 @@ from defi_yield_aggregator.adapters.protocols import (
     CompoundAdapter,
     ConvexAdapter,
     CurveAdapter,
+    FraxAdapter,
     LidoAdapter,
     RocketPoolAdapter,
     SushiSwapAdapter,
@@ -84,7 +85,7 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 10
+        assert len(adapters) == 11
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
@@ -191,7 +192,7 @@ class TestAdapters:
     def test_balancer_in_registry(self) -> None:
         """Balancer adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 10
+        assert len(adapters) == 11
         assert any(a.protocol == Protocol.BALANCER for a in adapters)
 
     def test_balancer_adapter_repr(self) -> None:
@@ -249,7 +250,7 @@ class TestAdapters:
     def test_convex_in_registry(self) -> None:
         """Convex adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 10
+        assert len(adapters) == 11
         assert any(a.protocol == Protocol.CONVEX for a in adapters)
 
     def test_convex_adapter_repr(self) -> None:
@@ -336,7 +337,7 @@ class TestAdapters:
     def test_sushiswap_in_registry(self) -> None:
         """SushiSwap adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 10
+        assert len(adapters) == 11
         assert any(a.protocol == Protocol.SUSHISWAP for a in adapters)
 
     def test_sushiswap_adapter_repr(self) -> None:
@@ -432,10 +433,103 @@ class TestAdapters:
     def test_rocket_pool_in_registry(self) -> None:
         """Rocket Pool adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 10
+        assert len(adapters) == 11
         assert any(a.protocol == Protocol.ROCKET_POOL for a in adapters)
 
     def test_rocket_pool_adapter_repr(self) -> None:
         adapter = RocketPoolAdapter()
         assert "RocketPoolAdapter" in repr(adapter)
         assert "rocket_pool" in repr(adapter)
+
+    # --- Frax tests ---
+
+    @pytest.mark.asyncio
+    async def test_frax_fetch_pools(self) -> None:
+        adapter = FraxAdapter()
+        pools = await adapter.fetch_pools()
+        assert len(pools) == 5
+        assert all(p.protocol == Protocol.FRAX for p in pools)
+
+    @pytest.mark.asyncio
+    async def test_frax_fetch_pools_chain_filter_eth(self) -> None:
+        adapter = FraxAdapter()
+        eth_pools = await adapter.fetch_pools(chain=Chain.ETHEREUM)
+        assert len(eth_pools) == 4
+        assert all(p.chain == Chain.ETHEREUM for p in eth_pools)
+
+    @pytest.mark.asyncio
+    async def test_frax_fetch_pools_chain_filter_arb(self) -> None:
+        adapter = FraxAdapter()
+        arb_pools = await adapter.fetch_pools(chain=Chain.ARBITRUM)
+        assert len(arb_pools) == 1
+        assert arb_pools[0].pool_id == "frax-sfrax-arb"
+
+    @pytest.mark.asyncio
+    async def test_frax_fetch_pool_detail(self) -> None:
+        adapter = FraxAdapter()
+        detail = await adapter.fetch_pool_detail("frax-sfrax-eth")
+        assert detail is not None
+        assert detail.pool_id == "frax-sfrax-eth"
+        assert detail.tvl_usd == 820_000_000
+        assert detail.apy == pytest.approx(0.0475)
+
+    @pytest.mark.asyncio
+    async def test_frax_fetch_pool_detail_not_found(self) -> None:
+        adapter = FraxAdapter()
+        detail = await adapter.fetch_pool_detail("nonexistent-pool")
+        assert detail is None
+
+    @pytest.mark.asyncio
+    async def test_frax_sfrax_staking_zero_il(self) -> None:
+        """sFRAX staking (single-asset) should have zero IL risk."""
+        adapter = FraxAdapter()
+        detail = await adapter.fetch_pool_detail("frax-sfrax-eth")
+        assert detail is not None
+        assert detail.impermanent_loss_risk == 0.0
+        assert detail.is_stable is True
+
+    @pytest.mark.asyncio
+    async def test_frax_stable_pools_low_il(self) -> None:
+        """Stable pools should have low IL risk."""
+        adapter = FraxAdapter()
+        stable_pools = [p for p in await adapter.fetch_pools() if p.is_stable]
+        assert len(stable_pools) == 4
+        assert all(p.impermanent_loss_risk < 0.01 for p in stable_pools)
+
+    @pytest.mark.asyncio
+    async def test_frax_non_stable_pool(self) -> None:
+        """Fraxlend WETH pool is non-stable with zero IL risk (lending)."""
+        adapter = FraxAdapter()
+        detail = await adapter.fetch_pool_detail("frax-fraxlend-frax-weth")
+        assert detail is not None
+        assert detail.is_stable is False
+        assert detail.impermanent_loss_risk == 0.0
+        assert detail.apy == pytest.approx(0.082)
+
+    @pytest.mark.asyncio
+    async def test_frax_fraxbp_curve_lp_has_il_risk(self) -> None:
+        """FraxBP Curve LP should have small but non-zero IL risk."""
+        adapter = FraxAdapter()
+        detail = await adapter.fetch_pool_detail("frax-fraxbp-curve")
+        assert detail is not None
+        assert detail.impermanent_loss_risk > 0.0
+        assert detail.daily_volume_usd == 35_000_000
+
+    @pytest.mark.asyncio
+    async def test_frax_multi_chain_coverage(self) -> None:
+        """Frax should cover Ethereum and Arbitrum."""
+        adapter = FraxAdapter()
+        pools = await adapter.fetch_pools()
+        chains = {p.chain for p in pools}
+        assert chains == {Chain.ETHEREUM, Chain.ARBITRUM}
+
+    def test_frax_in_registry(self) -> None:
+        """Frax adapter should be registered in get_all_adapters."""
+        adapters = get_all_adapters()
+        assert len(adapters) == 11
+        assert any(a.protocol == Protocol.FRAX for a in adapters)
+
+    def test_frax_adapter_repr(self) -> None:
+        adapter = FraxAdapter()
+        assert "FraxAdapter" in repr(adapter)
+        assert "frax" in repr(adapter)
