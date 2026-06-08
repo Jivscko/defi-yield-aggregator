@@ -18,6 +18,7 @@ PROTOCOL_META: dict[Protocol, tuple[int, int, int]] = {
     Protocol.UNISWAP: (2020, 5, 8),
     Protocol.CURVE: (2020, 4, 10),
     Protocol.YEARN: (2020, 3, 4),
+    Protocol.LIDO: (2020, 5, 6),
 }
 
 # TVL thresholds for scoring

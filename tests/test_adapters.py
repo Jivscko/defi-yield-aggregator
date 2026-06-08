@@ -8,6 +8,7 @@ from defi_yield_aggregator.adapters.protocols import (
     AaveAdapter,
     CompoundAdapter,
     CurveAdapter,
+    LidoAdapter,
     UniswapAdapter,
     YearnAdapter,
     get_all_adapters,
@@ -79,9 +80,45 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 5
+        assert len(adapters) == 6
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
         assert "AaveAdapter" in repr(adapter)
         assert "aave" in repr(adapter)
+
+    @pytest.mark.asyncio
+    async def test_lido_fetch_pools(self) -> None:
+        adapter = LidoAdapter()
+        pools = await adapter.fetch_pools()
+        assert len(pools) == 3
+        assert all(p.protocol == Protocol.LIDO for p in pools)
+
+    @pytest.mark.asyncio
+    async def test_lido_fetch_pools_chain_filter(self) -> None:
+        adapter = LidoAdapter()
+        eth_pools = await adapter.fetch_pools(chain=Chain.ETHEREUM)
+        assert len(eth_pools) == 1
+        assert eth_pools[0].pool_id == "lido-steth-eth"
+        assert all(p.chain == Chain.ETHEREUM for p in eth_pools)
+
+    @pytest.mark.asyncio
+    async def test_lido_fetch_pool_detail(self) -> None:
+        adapter = LidoAdapter()
+        detail = await adapter.fetch_pool_detail("lido-steth-eth")
+        assert detail is not None
+        assert detail.pool_id == "lido-steth-eth"
+        assert detail.tvl_usd == 14_000_000_000
+        assert detail.apy == pytest.approx(0.032)
+
+    @pytest.mark.asyncio
+    async def test_lido_fetch_pool_detail_not_found(self) -> None:
+        adapter = LidoAdapter()
+        detail = await adapter.fetch_pool_detail("nonexistent-pool")
+        assert detail is None
+
+    @pytest.mark.asyncio
+    async def test_lido_pools_have_zero_il_risk(self) -> None:
+        adapter = LidoAdapter()
+        pools = await adapter.fetch_pools()
+        assert all(p.impermanent_loss_risk == 0.0 for p in pools)

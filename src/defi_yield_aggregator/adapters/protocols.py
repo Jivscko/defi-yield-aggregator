@@ -280,6 +280,58 @@ class YearnAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class LidoAdapter(BaseAdapter):
+    """Adapter for Lido liquid staking protocol (stETH, stMATIC)."""
+
+    def __init__(self, base_url: str = "https://stake.lido.fi/api") -> None:
+        super().__init__(Protocol.LIDO, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Lido liquid staking pools. Currently returns mock data."""
+        mock_pools = [
+            PoolInfo(
+                protocol=Protocol.LIDO,
+                chain=Chain.ETHEREUM,
+                pool_id="lido-steth-eth",
+                pool_name="Lido stETH",
+                token_pair="stETH",
+                apy=0.032,
+                tvl_usd=14_000_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.LIDO,
+                chain=Chain.POLYGON,
+                pool_id="lido-stmatic-poly",
+                pool_name="Lido stMATIC (Polygon)",
+                token_pair="stMATIC",
+                apy=0.045,
+                tvl_usd=800_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.LIDO,
+                chain=Chain.ARBITRUM,
+                pool_id="lido-steth-arb",
+                pool_name="Lido stETH (Arbitrum via bridged)",
+                token_pair="stETH",
+                apy=0.030,
+                tvl_usd=400_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -287,6 +339,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.UNISWAP: UniswapAdapter,
     Protocol.CURVE: CurveAdapter,
     Protocol.YEARN: YearnAdapter,
+    Protocol.LIDO: LidoAdapter,
 }
 
 
