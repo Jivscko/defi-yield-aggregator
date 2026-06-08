@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "defi-yield-aggregator"
+version = "0.1.0"
+description = "A DeFi yield farming aggregator that monitors opportunities across multiple protocols"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Jivscko" }]
+keywords = ["defi", "yield", "aggregator", "blockchain", "ethereum"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+]
+
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "rich>=13.0,<14.0",
+    "click>=8.0,<9.0",
+    "pyyaml>=6.0,<7.0",
+    "numpy>=1.24,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+
+[project.scripts]
+defi-yield = "defi_yield_aggregator.cli.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/defi_yield_aggregator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

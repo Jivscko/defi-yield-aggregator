@@ -1,0 +1,63 @@
+# DeFi Yield Aggregator - Configuration
+
+# Protocol API endpoints (override defaults)
+protocols:
+  aave:
+    base_url: "https://aave-api-v2.aave.com"
+    enabled: true
+  compound:
+    base_url: "https://api.compound.finance"
+    enabled: true
+  uniswap:
+    base_url: "https://api.thegraph.com/subgraphs/name/uniswap"
+    enabled: true
+  curve:
+    base_url: "https://api.curve.fi"
+    enabled: true
+  yearn:
+    base_url: "https://api.yearn.fi"
+    enabled: true
+
+# Risk assessment parameters
+risk:
+  weights:
+    tvl: 0.35
+    age: 0.20
+    audit: 0.25
+    chain_diversity: 0.20
+  max_score: 70.0
+  tvl_thresholds:
+    - min_tvl: 10_000_000_000
+      score: 10
+    - min_tvl: 1_000_000_000
+      score: 20
+    - min_tvl: 100_000_000
+      score: 40
+    - min_tvl: 10_000_000
+      score: 60
+    - min_tvl: 1_000_000
+      score: 80
+
+# Portfolio optimization parameters
+portfolio:
+  min_tvl_usd: 1_000_000
+  max_single_allocation_pct: 0.30
+  min_positions: 2
+  max_positions: 10
+  preferred_chains:
+    - ethereum
+    - arbitrum
+    - optimism
+  preferred_protocols:
+    - aave
+    - compound
+    - curve
+    - yearn
+    - uniswap
+  stablecoins_only: false
+
+# Data refresh
+refresh:
+  interval_seconds: 300
+  retry_attempts: 3
+  retry_delay_seconds: 10
