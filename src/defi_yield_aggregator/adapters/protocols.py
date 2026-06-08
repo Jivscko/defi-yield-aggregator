@@ -332,6 +332,104 @@ class LidoAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class BalancerAdapter(BaseAdapter):
+    """Adapter for Balancer V2 weighted and boosted pools."""
+
+    def __init__(self, base_url: str = "https://api.balancer.fi") -> None:
+        super().__init__(Protocol.BALANCER, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Balancer V2 pools. Currently returns mock data.
+
+        Balancer supports weighted pools (e.g. 80/20 token allocations),
+        stable pools (similar to Curve for pegged assets), and
+        boosted pools (composable with Aave/Yearn for extra yield).
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of pool information.
+        """
+        mock_pools = [
+            PoolInfo(
+                protocol=Protocol.BALANCER,
+                chain=Chain.ETHEREUM,
+                pool_id="balancer-wsteth-weth-5050",
+                pool_name="Balancer wstETH/WETH 50/50",
+                token_pair="wstETH/WETH",
+                apy=0.0340,
+                tvl_usd=1_800_000_000,
+                daily_volume_usd=42_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.02,
+            ),
+            PoolInfo(
+                protocol=Protocol.BALANCER,
+                chain=Chain.ETHEREUM,
+                pool_id="balancer-stable-usdc-dai-usdt",
+                pool_name="Balancer Stable Pool (USDC/DAI/USDT)",
+                token_pair="USDC/DAI/USDT",
+                apy=0.0280,
+                tvl_usd=620_000_000,
+                daily_volume_usd=28_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.003,
+            ),
+            PoolInfo(
+                protocol=Protocol.BALANCER,
+                chain=Chain.ETHEREUM,
+                pool_id="balancer-80bal-20weth",
+                pool_name="Balancer 80BAL/20WETH",
+                token_pair="BAL/WETH",
+                apy=0.0890,
+                tvl_usd=185_000_000,
+                daily_volume_usd=5_500_000,
+                is_stable=False,
+                impermanent_loss_risk=0.45,
+            ),
+            PoolInfo(
+                protocol=Protocol.BALANCER,
+                chain=Chain.ARBITRUM,
+                pool_id="balancer-weth-usdc-arb",
+                pool_name="Balancer WETH/USDC 50/50 (Arbitrum)",
+                token_pair="WETH/USDC",
+                apy=0.0720,
+                tvl_usd=340_000_000,
+                daily_volume_usd=18_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.28,
+            ),
+            PoolInfo(
+                protocol=Protocol.BALANCER,
+                chain=Chain.POLYGON,
+                pool_id="balancer-boosted-aave-poly",
+                pool_name="Balancer Boosted Aave USDC/USDT (Polygon)",
+                token_pair="USDC/USDT",
+                apy=0.0480,
+                tvl_usd=275_000_000,
+                daily_volume_usd=8_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.005,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific Balancer pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``balancer-wsteth-weth-5050``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -340,6 +438,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.CURVE: CurveAdapter,
     Protocol.YEARN: YearnAdapter,
     Protocol.LIDO: LidoAdapter,
+    Protocol.BALANCER: BalancerAdapter,
 }
 
 

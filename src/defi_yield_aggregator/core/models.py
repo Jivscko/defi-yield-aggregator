@@ -25,6 +25,7 @@ class Protocol(str, Enum):
     CURVE = "curve"
     YEARN = "yearn"
     LIDO = "lido"
+    BALANCER = "balancer"
 
 
 class RiskLevel(str, Enum):
