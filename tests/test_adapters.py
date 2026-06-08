@@ -8,6 +8,7 @@ from defi_yield_aggregator.adapters.protocols import (
     AaveAdapter,
     BalancerAdapter,
     CompoundAdapter,
+    ConvexAdapter,
     CurveAdapter,
     LidoAdapter,
     UniswapAdapter,
@@ -81,7 +82,7 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 7
+        assert len(adapters) == 8
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
@@ -188,10 +189,68 @@ class TestAdapters:
     def test_balancer_in_registry(self) -> None:
         """Balancer adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 7
+        assert len(adapters) == 8
         assert any(a.protocol == Protocol.BALANCER for a in adapters)
 
     def test_balancer_adapter_repr(self) -> None:
         adapter = BalancerAdapter()
         assert "BalancerAdapter" in repr(adapter)
         assert "balancer" in repr(adapter)
+
+    # --- Convex tests ---
+
+    @pytest.mark.asyncio
+    async def test_convex_fetch_pools(self) -> None:
+        adapter = ConvexAdapter()
+        pools = await adapter.fetch_pools()
+        assert len(pools) == 5
+        assert all(p.protocol == Protocol.CONVEX for p in pools)
+
+    @pytest.mark.asyncio
+    async def test_convex_fetch_pools_chain_filter(self) -> None:
+        adapter = ConvexAdapter()
+        eth_pools = await adapter.fetch_pools(chain=Chain.ETHEREUM)
+        assert len(eth_pools) == 5
+        assert all(p.chain == Chain.ETHEREUM for p in eth_pools)
+
+    @pytest.mark.asyncio
+    async def test_convex_fetch_pool_detail(self) -> None:
+        adapter = ConvexAdapter()
+        detail = await adapter.fetch_pool_detail("convex-steth")
+        assert detail is not None
+        assert detail.pool_id == "convex-steth"
+        assert detail.tvl_usd == 1_600_000_000
+        assert detail.apy == pytest.approx(0.065)
+
+    @pytest.mark.asyncio
+    async def test_convex_fetch_pool_detail_not_found(self) -> None:
+        adapter = ConvexAdapter()
+        detail = await adapter.fetch_pool_detail("nonexistent-pool")
+        assert detail is None
+
+    @pytest.mark.asyncio
+    async def test_convex_stable_pools_low_il(self) -> None:
+        """Stable pools should have low IL risk."""
+        adapter = ConvexAdapter()
+        stable_pools = [p for p in await adapter.fetch_pools() if p.is_stable]
+        assert len(stable_pools) >= 2
+        assert all(p.impermanent_loss_risk < 0.01 for p in stable_pools)
+
+    @pytest.mark.asyncio
+    async def test_convex_non_stable_pools(self) -> None:
+        """Non-stable pools should be retrievable."""
+        adapter = ConvexAdapter()
+        non_stable = [p for p in await adapter.fetch_pools() if not p.is_stable]
+        assert len(non_stable) >= 2
+        assert all(p.protocol == Protocol.CONVEX for p in non_stable)
+
+    def test_convex_in_registry(self) -> None:
+        """Convex adapter should be registered in get_all_adapters."""
+        adapters = get_all_adapters()
+        assert len(adapters) == 8
+        assert any(a.protocol == Protocol.CONVEX for a in adapters)
+
+    def test_convex_adapter_repr(self) -> None:
+        adapter = ConvexAdapter()
+        assert "ConvexAdapter" in repr(adapter)
+        assert "convex" in repr(adapter)

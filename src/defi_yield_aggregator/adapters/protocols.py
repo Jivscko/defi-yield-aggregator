@@ -430,6 +430,100 @@ class BalancerAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class ConvexAdapter(BaseAdapter):
+    """Adapter for Convex Finance boosted Curve pools."""
+
+    def __init__(self, base_url: str = "https://www.convexfinance.com/api") -> None:
+        super().__init__(Protocol.CONVEX, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Convex Finance pools. Currently returns mock data.
+
+        Convex Finance boosts Curve LP yields by allowing users to stake CRV
+        tokens without locking them directly on Curve.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of pool information.
+        """
+        mock_pools = [
+            PoolInfo(
+                protocol=Protocol.CONVEX,
+                chain=Chain.ETHEREUM,
+                pool_id="convex-cvxcrv-staking",
+                pool_name="Convex cvxCRV Staking",
+                token_pair="cvxCRV",
+                apy=0.048,
+                tvl_usd=1_200_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+            PoolInfo(
+                protocol=Protocol.CONVEX,
+                chain=Chain.ETHEREUM,
+                pool_id="convex-3pool",
+                pool_name="Convex Curve 3Pool Staking",
+                token_pair="DAI/USDC/USDT",
+                apy=0.052,
+                tvl_usd=850_000_000,
+                daily_volume_usd=45_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.005,
+            ),
+            PoolInfo(
+                protocol=Protocol.CONVEX,
+                chain=Chain.ETHEREUM,
+                pool_id="convex-steth",
+                pool_name="Convex Curve stETH/ETH",
+                token_pair="stETH/ETH",
+                apy=0.065,
+                tvl_usd=1_600_000_000,
+                daily_volume_usd=30_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.04,
+            ),
+            PoolInfo(
+                protocol=Protocol.CONVEX,
+                chain=Chain.ETHEREUM,
+                pool_id="convex-frax-usdc",
+                pool_name="Convex Curve FRAX/USDC",
+                token_pair="FRAX/USDC",
+                apy=0.058,
+                tvl_usd=420_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.003,
+            ),
+            PoolInfo(
+                protocol=Protocol.CONVEX,
+                chain=Chain.ETHEREUM,
+                pool_id="convex-cvx-staking",
+                pool_name="Convex CVX Staking",
+                token_pair="CVX",
+                apy=0.072,
+                tvl_usd=380_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific Convex pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``convex-steth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -439,6 +533,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.YEARN: YearnAdapter,
     Protocol.LIDO: LidoAdapter,
     Protocol.BALANCER: BalancerAdapter,
+    Protocol.CONVEX: ConvexAdapter,
 }
 
 
