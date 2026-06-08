@@ -60,6 +60,7 @@ _PROTOCOL_MULTIPLIERS: dict[Protocol, float] = {
     Protocol.YEARN: 1.2,
     Protocol.LIDO: 0.85,  # Liquid staking is simpler
     Protocol.BALANCER: 1.15,
+    Protocol.MAKERDAO: 0.80,  # DSR is very simple (single-asset deposit)
 }
 
 # Mock gas prices in gwei by chain

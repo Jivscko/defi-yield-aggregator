@@ -880,6 +880,143 @@ class FraxAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class MakerDAOAdapter(BaseAdapter):
+    """Adapter for MakerDAO DAI Savings Rate (DSR) and sDAI vaults.
+
+    MakerDAO's DAI Savings Rate (DSR) is one of the most battle-tested
+    yield primitives in DeFi.  Users deposit DAI into the DSR module
+    (or the sDAI ERC-4626 wrapper on SparkLend) and earn a governance-
+    determined rate funded by stability fees on outstanding DAI debt.
+
+    Key characteristics:
+    - Single-asset (DAI) — zero impermanent loss.
+    - Rate is set by MKR governance; has ranged 1 %–8 % historically.
+    - sDAI is an ERC-4626 vault, composable across DeFi.
+    - Also covers SparkLend (MakerDAO-affiliated lending market).
+
+    All data is mock / indicative.
+    """
+
+    def __init__(self, base_url: str = "https://api.makerdao.com") -> None:
+        super().__init__(Protocol.MAKERDAO, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch MakerDAO DSR and SparkLend pools.
+
+        Returns pools across Ethereum and Gnosis Chain:
+        - **sDAI** – ERC-4626 wrapper around the DSR module.
+        - **DSR direct** – raw DSR deposit (included for completeness).
+        - **SparkLend** – MakerDAO-affiliated lending markets.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of :class:`PoolInfo` objects.
+        """
+        mock_pools: list[PoolInfo] = [
+            # ── sDAI vault (Ethereum) ─────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ETHEREUM,
+                pool_id="makerdao-sdai-eth",
+                pool_name="MakerDAO sDAI Savings (ERC-4626)",
+                token_pair="sDAI",
+                apy=0.0500,
+                tvl_usd=3_200_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── sDAI vault (Gnosis Chain) ─────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ETHEREUM,  # Gnosis not in Chain enum; label as Ethereum
+                pool_id="makerdao-sdai-gnosis",
+                pool_name="MakerDAO sDAI Savings (Gnosis)",
+                token_pair="sDAI",
+                apy=0.0500,
+                tvl_usd=145_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── SparkLend DAI (Ethereum) ──────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ETHEREUM,
+                pool_id="makerdao-spark-dai-eth",
+                pool_name="SparkLend DAI (Ethereum)",
+                token_pair="DAI",
+                apy=0.0430,
+                tvl_usd=1_800_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── SparkLend USDC (Ethereum) ─────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ETHEREUM,
+                pool_id="makerdao-spark-usdc-eth",
+                pool_name="SparkLend USDC (Ethereum)",
+                token_pair="USDC",
+                apy=0.0380,
+                tvl_usd=620_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── SparkLend WETH (Ethereum) ─────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ETHEREUM,
+                pool_id="makerdao-spark-weth-eth",
+                pool_name="SparkLend WETH (Ethereum)",
+                token_pair="WETH",
+                apy=0.0195,
+                tvl_usd=480_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+            # ── SparkLend DAI (Arbitrum) ──────────────────────────────
+            PoolInfo(
+                protocol=Protocol.MAKERDAO,
+                chain=Chain.ARBITRUM,
+                pool_id="makerdao-spark-dai-arb",
+                pool_name="SparkLend DAI (Arbitrum)",
+                token_pair="DAI",
+                apy=0.0460,
+                tvl_usd=210_000_000,
+                is_stable=True,
+                impermanent_loss_risk=0.0,
+                deposit_fee=0.0,
+                withdrawal_fee=0.0,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific MakerDAO pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``makerdao-sdai-eth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -893,6 +1030,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.SUSHISWAP: SushiSwapAdapter,
     Protocol.ROCKET_POOL: RocketPoolAdapter,
     Protocol.FRAX: FraxAdapter,
+    Protocol.MAKERDAO: MakerDAOAdapter,
 }
 
 
