@@ -86,7 +86,7 @@ class TestAdapters:
 
     def test_get_all_adapters(self) -> None:
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
 
     def test_adapter_repr(self) -> None:
         adapter = AaveAdapter()
@@ -193,7 +193,7 @@ class TestAdapters:
     def test_balancer_in_registry(self) -> None:
         """Balancer adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
         assert any(a.protocol == Protocol.BALANCER for a in adapters)
 
     def test_balancer_adapter_repr(self) -> None:
@@ -251,7 +251,7 @@ class TestAdapters:
     def test_convex_in_registry(self) -> None:
         """Convex adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
         assert any(a.protocol == Protocol.CONVEX for a in adapters)
 
     def test_convex_adapter_repr(self) -> None:
@@ -338,7 +338,7 @@ class TestAdapters:
     def test_sushiswap_in_registry(self) -> None:
         """SushiSwap adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
         assert any(a.protocol == Protocol.SUSHISWAP for a in adapters)
 
     def test_sushiswap_adapter_repr(self) -> None:
@@ -434,7 +434,7 @@ class TestAdapters:
     def test_rocket_pool_in_registry(self) -> None:
         """Rocket Pool adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
         assert any(a.protocol == Protocol.ROCKET_POOL for a in adapters)
 
     def test_rocket_pool_adapter_repr(self) -> None:
@@ -527,7 +527,7 @@ class TestAdapters:
     def test_frax_in_registry(self) -> None:
         """Frax adapter should be registered in get_all_adapters."""
         adapters = get_all_adapters()
-        assert len(adapters) == 12
+        assert len(adapters) == 13
         assert any(a.protocol == Protocol.FRAX for a in adapters)
 
     def test_frax_adapter_repr(self) -> None:

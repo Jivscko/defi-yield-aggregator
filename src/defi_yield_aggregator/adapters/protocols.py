@@ -1017,6 +1017,135 @@ class MakerDAOAdapter(BaseAdapter):
         return next((p for p in pools if p.pool_id == pool_id), None)
 
 
+class PendleAdapter(BaseAdapter):
+    """Adapter for Pendle Finance yield tokenization protocol."""
+
+    def __init__(self, base_url: str = "https://api-v2.pendle.finance") -> None:
+        super().__init__(Protocol.PENDLE, base_url)
+
+    async def fetch_pools(self, chain: Chain | None = None) -> list[PoolInfo]:
+        """Fetch Pendle Finance pools. Currently returns mock data.
+
+        Pendle Finance enables yield tokenization — users can trade yield
+        tokens (YT), provide liquidity in PT/YT AMM pools, lock PT for
+        fixed yield at maturity, or stake PENDLE for vePENDLE boosted yields.
+
+        Args:
+            chain: Optional chain filter.
+
+        Returns:
+            List of pool information.
+        """
+        mock_pools = [
+            # ── ETH Staking PT (Ethereum) ────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ETHEREUM,
+                pool_id="pendle-eth-staking-pt-eth",
+                pool_name="Pendle ETH Staking PT (Fixed Yield)",
+                token_pair="PT-ETH",
+                apy=0.0980,
+                tvl_usd=420_000_000,
+                daily_volume_usd=12_000_000,
+                is_stable=False,
+                impermanent_loss_risk=0.02,
+            ),
+            # ── stETH PT (Ethereum) ──────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ETHEREUM,
+                pool_id="pendle-steth-pt-eth",
+                pool_name="Pendle stETH PT (Fixed Yield)",
+                token_pair="PT-stETH",
+                apy=0.0640,
+                tvl_usd=310_000_000,
+                daily_volume_usd=8_500_000,
+                is_stable=False,
+                impermanent_loss_risk=0.01,
+            ),
+            # ── USDC LP (Ethereum) ───────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ETHEREUM,
+                pool_id="pendle-usdc-lp-eth",
+                pool_name="Pendle USDC LP (Ethereum)",
+                token_pair="PT-USDC/USDC",
+                apy=0.0820,
+                tvl_usd=185_000_000,
+                daily_volume_usd=6_200_000,
+                is_stable=True,
+                impermanent_loss_risk=0.08,
+            ),
+            # ── rETH YT (Ethereum) ───────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ETHEREUM,
+                pool_id="pendle-reth-yt-eth",
+                pool_name="Pendle rETH YT (Yield Speculation)",
+                token_pair="YT-rETH",
+                apy=0.1450,
+                tvl_usd=95_000_000,
+                daily_volume_usd=3_800_000,
+                is_stable=False,
+                impermanent_loss_risk=0.03,
+            ),
+            # ── GLP PT (Arbitrum) ────────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ARBITRUM,
+                pool_id="pendle-glp-pt-arb",
+                pool_name="Pendle GLP PT (Fixed Yield, Arbitrum)",
+                token_pair="PT-GLP",
+                apy=0.1920,
+                tvl_usd=120_000_000,
+                daily_volume_usd=4_500_000,
+                is_stable=False,
+                impermanent_loss_risk=0.03,
+            ),
+            # ── USDC LP (Arbitrum) ───────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ARBITRUM,
+                pool_id="pendle-usdc-lp-arb",
+                pool_name="Pendle USDC LP (Arbitrum)",
+                token_pair="PT-USDC/USDC",
+                apy=0.0950,
+                tvl_usd=85_000_000,
+                daily_volume_usd=3_200_000,
+                is_stable=True,
+                impermanent_loss_risk=0.07,
+            ),
+            # ── wstETH LP (Arbitrum) ─────────────────────────────────
+            PoolInfo(
+                protocol=Protocol.PENDLE,
+                chain=Chain.ARBITRUM,
+                pool_id="pendle-wsteth-lp-arb",
+                pool_name="Pendle wstETH LP (Arbitrum)",
+                token_pair="PT-wstETH/wstETH",
+                apy=0.0680,
+                tvl_usd=72_000_000,
+                daily_volume_usd=2_100_000,
+                is_stable=False,
+                impermanent_loss_risk=0.10,
+            ),
+        ]
+        if chain:
+            return [p for p in mock_pools if p.chain == chain]
+        return mock_pools
+
+    async def fetch_pool_detail(self, pool_id: str) -> PoolInfo | None:
+        """Fetch detail for a specific Pendle pool.
+
+        Args:
+            pool_id: Pool identifier (e.g. ``pendle-eth-staking-pt-eth``).
+
+        Returns:
+            Pool info or None if not found.
+        """
+        pools = await self.fetch_pools()
+        return next((p for p in pools if p.pool_id == pool_id), None)
+
+
 # Registry of all adapters
 ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.AAVE: AaveAdapter,
@@ -1031,6 +1160,7 @@ ADAPTERS: dict[Protocol, type[BaseAdapter]] = {
     Protocol.ROCKET_POOL: RocketPoolAdapter,
     Protocol.FRAX: FraxAdapter,
     Protocol.MAKERDAO: MakerDAOAdapter,
+    Protocol.PENDLE: PendleAdapter,
 }
 
 
