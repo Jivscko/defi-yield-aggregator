@@ -78,6 +78,7 @@ class RiskScore(BaseModel):
     chain_diversity_score: float = Field(ge=0, le=100, default=0.0)
     liquidity_score: float = Field(ge=0, le=100, default=0.0)
     smart_contract_risk_score: float = Field(ge=0, le=100, default=0.0)
+    governance_risk_score: float = Field(ge=0, le=100, default=0.0)
     details: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("risk_level", mode="before")
